@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: oppe2-fastapi-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: oppe2-fastapi
+  ports:
+    - port: 80
+      targetPort: 8000

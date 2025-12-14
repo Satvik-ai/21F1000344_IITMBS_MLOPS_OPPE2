@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oppe2-fastapi
+  labels:
+    app: oppe2-fastapi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oppe2-fastapi
+  template:
+    metadata:
+      labels:
+        app: oppe2-fastapi
+    spec:
+      containers:
+        - name: oppe2-fastapi
+          image: us-central1-docker.pkg.dev/iitmbs-mlops/oppe2-repo/oppe2-fastapi:latest
+          ports:
+            - containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /ready_check
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /live_check
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          envFrom:
+            - configMapRef:
+                name: oppe2-fastapi-config
+          env:
+            - name: GOOGLE_CLOUD_PROJECT
+              value: "iitmbs-mlops"
+            - name: OTEL_SERVICE_NAME
+              value: "oppe2-fastapi"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "https://otel.googleapis.com:4317"
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.name=oppe2-fastapi"

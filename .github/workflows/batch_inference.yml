@@ -1,0 +1,115 @@
+name: Batch Inference
+
+on:
+  workflow_dispatch:
+
+env:
+  SERVICE_URL: ${{ secrets.SERVICE_URL }}
+
+jobs:
+  batch-inference:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas requests dvc dvc-gs
+
+      - name: Configure DVC Remote
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GCP_KEY_JSON }}
+        run: |
+          echo "${GOOGLE_APPLICATION_CREDENTIALS}" > gcp-key.json
+          dvc remote modify myremote credentialpath gcp-key.json
+        
+      - name: Setup GCP credentials
+        run: |
+          echo "${{ secrets.GCP_KEY_BASE64 }}" | base64 --decode > gcp-key.json
+          echo "GCP key file written to gcp-key.json"
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: gcp-key.json
+
+      - name: Pull data from DVC
+        run: dvc pull -r myremote
+
+      - name: Run batch inference
+        env:
+          SERVICE_URL: ${{ env.SERVICE_URL }}
+        run: |
+          python <<'PYCODE'
+          import pandas as pd
+          import requests
+          import json
+
+          DATA_PATH = "data/generated_test_data.csv"
+          MODEL_URL = "${SERVICE_URL}"
+
+          df = pd.read_csv(DATA_PATH)
+
+          results = []
+
+          for idx, row in df.iterrows():
+              payload = row.to_dict()
+
+              response = requests.post(
+                  MODEL_URL,
+                  json=payload,
+                  timeout=10
+              )
+
+              if response.status_code != 200:
+                  prediction = "ERROR"
+                  probability = None
+              else:
+                  resp = response.json()
+                  prediction = resp.get("predicted_class")
+                  probability = resp.get("probability_heart_disease_present")
+
+              results.append({
+                  **payload,
+                  "prediction": prediction,
+                  "probability": probability
+              })
+
+          result_df = pd.DataFrame(results)
+          result_df.to_csv("batch_predictions.csv", index=False)
+
+          print("Batch inference completed. Saved results to batch_predictions.csv")
+          PYCODE
+
+      - name: Setup CML
+        uses: iterative/setup-cml@v2
+        with:
+          version: latest
+
+      - name: Publish CML report
+        env:
+          REPO_TOKEN: ${{ secrets.CML_TOKEN }}
+        run: |
+          echo "## 🧪 Batch Inference Report" > report.md
+          echo "" >> report.md
+          echo "**Model Endpoint:** \`${SERVICE_URL}\`" >> report.md
+          echo "" >> report.md
+          echo "### Predictions" >> report.md
+          echo "" >> report.md
+          echo "| Age | Gender | CP | Trestbps | Chol | FBS | RestECG | Thalach | Exang | Oldpeak | Slope | CA | Thal | Prediction | Probability |" >> report.md
+          echo "|-----|--------|----|----------|------|-----|----------|----------|--------|---------|-------|----|------|------------|-------------|" >> report.md
+
+          tail -n +2 batch_predictions.csv | while IFS=',' read -r age gender cp trestbps chol fbs restecg thalach exang oldpeak slope ca thal pred prob
+          do
+            echo "| $age | $gender | $cp | $trestbps | $chol | $fbs | $restecg | $thalach | $exang | $oldpeak | $slope | $ca | $thal | $pred | $prob |" >> report.md
+          done
+
+          cml comment create report.md
