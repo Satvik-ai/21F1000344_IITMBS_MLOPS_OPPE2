@@ -52,9 +52,10 @@ jobs:
           import pandas as pd
           import requests
           import json
+          import os
 
           DATA_PATH = "data/generated_test_data.csv"
-          MODEL_URL = $SERVICE_URL
+          MODEL_URL = os.environ["SERVICE_URL"]
 
           df = pd.read_csv(DATA_PATH)
 
