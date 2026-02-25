@@ -152,10 +152,10 @@ Triggered after successful CI on main branch:
 ## ⚖️ Responsible AI
 
 ### Fairness
-Evaluates model bias across age groups using :contentReference[oaicite:3]{index=3}.
+Evaluates model bias across **age groups** using Fairlearn.
 
 ### Explainability
-:contentReference[oaicite:4]{index=4} summary plot shows:
+SHAP summary plot shows:
 
 - Feature importance  
 - Direction of impact on predictions
@@ -164,3 +164,4 @@ Evaluates model bias across age groups using :contentReference[oaicite:3]{index=
 
 ## 🎥 Video Presentation  
 [▶️ Click Here](https://drive.google.com/file/d/1DWVUCL1RrnMdETyQMVAhNdhiMSggI2NP/view?usp=drive_link)
+
